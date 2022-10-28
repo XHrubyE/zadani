@@ -74,13 +74,24 @@ begin
   ptr_cntr: process (RESET, CLK)
   begin
     if (RESET = '1') then
-      PTR <= "1000000000000"; -- 0x1000 address
-    elsif (CLK'event) and (CLK='1') then
-      if (PTR_INC = '1') then
-        PTR <= PTR + 1;
+      PTR <= "1000000000000";            -- 0x1000 address
+    elsif (CLK'event) and (CLK='1') then 
+
+      if (PTR_INC = '1') then      
+        if (PTR = "1111111111111") then  -- 0x1FFF address
+          PTR <= "1000000000000";        -- 0x1000 address
+        else
+          PTR <= PTR + 1;
+        end if;
+        
       elsif (PTR_DEC = '1') then
-        PTR <= PTR - 1;
-      end if;      
+        if (PTR = "1000000000000") then  -- 0x1000 address
+          PTR <= "1111111111111";        -- 0x1FFF address
+        else
+          PTR <= PTR - 1;
+        end if;
+        
+      end if;            
     end if;
   end process;
 
@@ -116,11 +127,13 @@ begin
     IN_REQ <= '0';
     OUT_WE <= '0';
 
-    -- FSM
+    -- REGISTERS
     PC_INC <= '0';
     PC_DEC <= '0';
     PTR_INC <= '0';
     PTR_DEC <= '0';
+
+    -- MULTIPLEXORS
     MX1_SEL <= '0';
     MX2_SEL <= "00";
     ------------------------------------
@@ -173,6 +186,14 @@ begin
         MX1_SEL <= '1';
         DATA_EN <= '1';
         DATA_RDWR <= '1';
+      
+      when incptr =>
+        NSTATE <= fetch0;
+        PTR_INC <= '1';
+      
+      when decptr =>
+        NSTATE <= fetch0;
+        PTR_DEC <= '1';
 
       when others => null;      
     end case;
