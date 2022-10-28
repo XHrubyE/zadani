@@ -53,7 +53,7 @@ architecture behavioral of cpu is
   
   type fsm_state is (idle, fetch0, fetch1, decode, 
                       incvalue0, incvalue1, decvalue0, decvalue1, 
-                      incptr, decptr);
+                      incptr, decptr, print0, print1, print2, printwait);
   signal PSTATE  : fsm_state;
   signal NSTATE  : fsm_state;
 begin
@@ -149,7 +149,8 @@ begin
         NSTATE <= decode;        
         PC_INC <= '1';
 
-      when decode =>
+      ------- decode instruction ---------
+      when decode =>  
         case DATA_RDATA is
           when X"2B" =>     
             NSTATE <= incvalue0;
@@ -159,10 +160,14 @@ begin
 
           when X"3E" =>
             NSTATE <= incptr;
+          
+          when X"2E" =>
+            NSTATE <= print0;
 
           when others => null;
-        end case;
-      
+        end case;        
+      ------------------------------------
+
       when incvalue0 =>
         NSTATE <= incvalue1;
         MX1_SEL <= '1';
@@ -195,6 +200,25 @@ begin
         NSTATE <= fetch0;
         PTR_DEC <= '1';
 
+      when print0 =>
+        NSTATE <= print1;
+        MX1_SEL <= '1';
+        DATA_EN <= '1';
+      
+      when print1 =>
+        NSTATE <= print2;        
+
+      when print2 =>
+        if (OUT_BUSY = '0') then
+          NSTATE <= fetch0;
+          OUT_DATA <= DATA_RDATA;          
+          OUT_WE <= '1';
+        else
+          NSTATE <= printwait;
+        end if;          
+
+      when printwait =>
+          NSTATE <= print2;
       when others => null;      
     end case;
   end process;      
