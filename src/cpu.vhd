@@ -61,7 +61,7 @@ architecture behavioral of cpu is
                       incptr, decptr, 
                       print0, print1, print2, printwait,
                       read0, read1, readwait, 
-                      whilebegin, while1, 
+                      whilebegin, whilebegin1, while1, while2, while3, while4, while5,
                       whileend, whileend0, whileend1, whileend2, whileend3, whileend4, whileend5, whileend6);
   signal PSTATE  : fsm_state;
   signal NSTATE  : fsm_state;
@@ -293,14 +293,47 @@ begin
         end if;
         
       when whilebegin =>
-        NSTATE <= while1;
+        NSTATE <= whilebegin1;
         MX1_SEL <= '1';
-        DATA_EN <= '1';        
+        DATA_EN <= '1';
+      
+      when whilebegin1 =>
+        NSTATE <= while1;
       
       when while1 =>
         if (DATA_RDATA = "00000000") then
+          NSTATE <= while2;          
+          CNT_INC <= '1';
+          DATA_EN <= '1';
         else
           NSTATE <= fetch0;
+        end if;
+
+      when while4 =>
+        NSTATE <= while2;
+        DATA_EN <= '1';
+
+      when while2 =>
+        NSTATE <= while3;
+
+      when while3 =>
+        NSTATE <= while5;
+        if (DATA_RDATA = X"5B") then          
+          CNT_INC <= '1';
+        elsif (DATA_RDATA = X"5D") then
+          CNT_DEC <= '1';
+        else
+          NSTATE <= while4;
+          PC_INC <= '1';
+        end if;
+
+      when while5 =>
+        if (CNT = "00000000") then
+          NSTATE <= fetch0;
+          PC_INC <= '1';            
+        else 
+          NSTATE <= while4;
+          PC_INC <= '1';
         end if;
       
       when whileend =>
