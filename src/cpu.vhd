@@ -51,9 +51,11 @@ architecture behavioral of cpu is
   signal MX1_SEL : std_logic;
   signal MX2_SEL : std_logic_vector(1 downto 0);
   
-  type fsm_state is (idle, fetch0, fetch1, decode, 
+  type fsm_state is ( idle, fetch0, fetch1, decode, 
                       incvalue0, incvalue1, decvalue0, decvalue1, 
-                      incptr, decptr, print0, print1, print2, printwait);
+                      incptr, decptr, 
+                      print0, print1, print2, printwait,
+                      read0, read1, readwait);
   signal PSTATE  : fsm_state;
   signal NSTATE  : fsm_state;
 begin
@@ -164,6 +166,9 @@ begin
           when X"2E" =>
             NSTATE <= print0;
 
+          when X"2C" =>
+            NSTATE <= read0;
+
           when others => null;
         end case;        
       ------------------------------------
@@ -218,7 +223,36 @@ begin
         end if;          
 
       when printwait =>
-          NSTATE <= print2;
+        NSTATE <= print2;
+
+      when read0 =>
+        NSTATE <= read1;
+        IN_REQ <= '1';                                        
+      
+      when read1 => 
+        if (IN_VLD = '1') then
+          NSTATE <= fetch0;
+          MX2_SEL <= "00";
+          MX1_SEL <= '1';
+          DATA_EN <= '1';
+          DATA_RDWR <= '1';
+        else
+          IN_REQ <= '1';
+          NSTATE <= readwait;
+        end if;        
+      
+      when readwait =>
+        if (IN_VLD = '1') then
+          NSTATE <= fetch0;
+          MX2_SEL <= "00";
+          MX1_SEL <= '1';
+          DATA_EN <= '1';
+          DATA_RDWR <= '1';
+        else
+          IN_REQ <= '1';
+          NSTATE <= read1;
+        end if;  
+
       when others => null;      
     end case;
   end process;      
