@@ -193,10 +193,16 @@ begin
             NSTATE <= decvalue0;
             
           when X"5B" =>
-           NSTATE <= whilebegin;
+            NSTATE <= whilebegin;
 
           when X"5D" =>
-           NSTATE <= whileend;
+            NSTATE <= whileend;
+
+          when X"28" =>
+            NSTATE <= fetch0;
+
+          when X"29" =>
+            NSTATE <= whileend;
           
           when X"2E" =>
             NSTATE <= print0;
@@ -318,9 +324,9 @@ begin
 
       when while3 =>
         NSTATE <= while5;
-        if (DATA_RDATA = X"5B") then          
+        if (DATA_RDATA = X"5B" or DATA_RDATA = X"28") then          
           CNT_INC <= '1';
-        elsif (DATA_RDATA = X"5D") then
+        elsif (DATA_RDATA = X"5D" or DATA_RDATA = X"29") then
           CNT_DEC <= '1';
         else
           NSTATE <= while4;
@@ -328,12 +334,11 @@ begin
         end if;
 
       when while5 =>
+        PC_INC <= '1'; 
         if (CNT = "00000000") then
-          NSTATE <= fetch0;
-          PC_INC <= '1';            
+          NSTATE <= fetch0;                     
         else 
-          NSTATE <= while4;
-          PC_INC <= '1';
+          NSTATE <= while4;          
         end if;
       
       when whileend =>
@@ -366,9 +371,9 @@ begin
 
         when whileend5 =>
           NSTATE <= whileend6;
-          if (DATA_RDATA = X"5D") then          
+          if (DATA_RDATA = X"5D" or DATA_RDATA = X"29") then          
             CNT_INC <= '1';
-          elsif (DATA_RDATA = X"5B") then
+          elsif (DATA_RDATA = X"5B" or DATA_RDATA = X"28") then
             CNT_DEC <= '1';
           else
             NSTATE <= whileend3;
