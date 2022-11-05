@@ -48,19 +48,26 @@ architecture behavioral of cpu is
   signal PTR_INC : std_logic;
   signal PTR_DEC : std_logic;
 
+  signal CNT     : std_logic_vector(7 downto 0); -- s predpokladom ze 256 zanoreni bude stacit
+  signal CNT_INC : std_logic;
+  signal CNT_DEC : std_logic;
+
+
   signal MX1_SEL : std_logic;
   signal MX2_SEL : std_logic_vector(1 downto 0);
   
-  type fsm_state is ( idle, fetch0, fetch1, decode, 
+  type fsm_state is ( idle, halt, fetch0, fetch1, decode, 
                       incvalue0, incvalue1, decvalue0, decvalue1, 
                       incptr, decptr, 
                       print0, print1, print2, printwait,
-                      read0, read1, readwait);
+                      read0, read1, readwait, 
+                      whilebegin, while1, 
+                      whileend, whileend0, whileend1, whileend2, whileend3, whileend4, whileend5, whileend6);
   signal PSTATE  : fsm_state;
   signal NSTATE  : fsm_state;
 begin
 
-  pc_cntr: process (RESET, CLK)
+  pc_reg: process (RESET, CLK)
   begin
     if (RESET = '1') then 
     PC <= (others => '0');
@@ -73,7 +80,7 @@ begin
     end if;
   end process;
 
-  ptr_cntr: process (RESET, CLK)
+  ptr_reg: process (RESET, CLK)
   begin
     if (RESET = '1') then
       PTR <= "1000000000000";            -- 0x1000 address
@@ -96,6 +103,20 @@ begin
       end if;            
     end if;
   end process;
+
+  cnt_reg: process (RESET, CLK)
+  begin
+    if (RESET = '1') then 
+    CNT <= (others => '0');
+    elsif (CLK'event) and (CLK='1') then
+      if (CNT_INC = '1') then
+        CNT <= CNT + 1;
+      elsif (CNT_DEC = '1') then
+        CNT <= CNT - 1;
+      end if;
+    end if;
+  end process;
+
 
   DATA_ADDR  <= PC             when (MX1_SEL = '0')  else PTR; -- MX1
 
@@ -134,6 +155,8 @@ begin
     PC_DEC <= '0';
     PTR_INC <= '0';
     PTR_DEC <= '0';
+    CNT_INC <= '0';
+    CNT_DEC <= '0';
 
     -- MULTIPLEXORS
     MX1_SEL <= '0';
@@ -141,7 +164,10 @@ begin
     ------------------------------------
     case PSTATE is    
       when idle =>
-        NSTATE <= fetch0; 
+        NSTATE <= fetch0;
+        
+      when halt =>
+        NSTATE <= halt;
 
       when fetch0 =>
         NSTATE <= fetch1;
@@ -154,14 +180,23 @@ begin
       ------- decode instruction ---------
       when decode =>  
         case DATA_RDATA is
+          when X"3E" =>
+            NSTATE <= incptr;
+
+          when X"3C" =>
+            NSTATE <= decptr;
+
           when X"2B" =>     
             NSTATE <= incvalue0;
 
           when X"2D" =>
-            NSTATE <= decvalue0; 
+            NSTATE <= decvalue0;
+            
+          when X"5B" =>
+           NSTATE <= whilebegin;
 
-          when X"3E" =>
-            NSTATE <= incptr;
+          when X"5D" =>
+           NSTATE <= whileend;
           
           when X"2E" =>
             NSTATE <= print0;
@@ -169,7 +204,11 @@ begin
           when X"2C" =>
             NSTATE <= read0;
 
-          when others => null;
+          when X"00" => 
+            NSTATE <= halt;
+
+          when others => 
+            NSTATE <= fetch0;
         end case;        
       ------------------------------------
 
@@ -251,9 +290,66 @@ begin
         else
           IN_REQ <= '1';
           NSTATE <= read1;
-        end if;  
+        end if;
+        
+      when whilebegin =>
+        NSTATE <= while1;
+        MX1_SEL <= '1';
+        DATA_EN <= '1';        
+      
+      when while1 =>
+        if (DATA_RDATA = "00000000") then
+        else
+          NSTATE <= fetch0;
+        end if;
+      
+      when whileend =>
+        NSTATE <= whileend0;
+        MX1_SEL <= '1';
+        DATA_EN <= '1';
 
-      when others => null;      
+      when whileend0 =>
+        NSTATE <= whileend1;
+
+      when whileend1 =>
+        if (DATA_RDATA = "00000000") then
+          NSTATE <= fetch0;
+        else
+          NSTATE <= whileend2;
+          CNT_INC <= '1';
+          PC_DEC <= '1';
+        end if;
+      
+        when whileend2 =>
+          NSTATE <= whileend3;
+          PC_DEC <= '1';
+
+        when whileend3 =>
+          NSTATE <= whileend4;
+          DATA_EN <= '1';
+        
+        when whileend4 =>
+          NSTATE <= whileend5;
+
+        when whileend5 =>
+          NSTATE <= whileend6;
+          if (DATA_RDATA = X"5D") then          
+            CNT_INC <= '1';
+          elsif (DATA_RDATA = X"5B") then
+            CNT_DEC <= '1';
+          else
+            NSTATE <= whileend3;
+            PC_DEC <= '1';
+          end if;
+
+        when whileend6 =>
+          if (CNT = "00000000") then
+            NSTATE <= fetch0;            
+          else 
+            NSTATE <= whileend3;
+            PC_DEC <= '1';
+          end if;
+
     end case;
   end process;      
 end behavioral;
